@@ -170,6 +170,8 @@ public:
 
   virtual void replace(uint64_t addr, uint32_t *ai, uint32_t *s, uint32_t *w) = 0;
 
+  virtual void replace(uint64_t addr, uint32_t *ai, uint32_t *s, uint32_t *w, uint32_t* v_ai, uint32_t *v_s, uint32_t* v_w) {} // only useful for CacheSkewed(Norm)WithVC
+
   // hook interface for replacer state update, Monitor and delay estimation
   virtual void hook_read(uint64_t addr, uint32_t ai, uint32_t s, uint32_t w, bool hit, uint64_t *delay) = 0;
   virtual void hook_write(uint64_t addr, uint32_t ai, uint32_t s, uint32_t w, bool hit, uint64_t *delay) = 0;
@@ -178,6 +180,8 @@ public:
 
   virtual CMMetadataBase *access(uint32_t ai, uint32_t s, uint32_t w) = 0;
   virtual CMDataBase *get_data(uint32_t ai, uint32_t s, uint32_t w) = 0;
+
+  virtual uint32_t get_Partition_size() { return 0; }
 
   // monitor related
   bool attach_monitor(MonitorBase *m) {
@@ -265,10 +269,89 @@ public:
   virtual CMDataBase *get_data(uint32_t ai, uint32_t s, uint32_t w){
     return arrays[ai]->get_data(s, w);
   }
+
+  virtual uint32_t get_Partition_size() { return P; }
 };
 
 // Normal set-associative cache
 template<int IW, int NW, typename MT, typename DT, typename IDX, typename RPC, typename DLY, bool EnMon>
 using CacheNorm = CacheSkewed<IW, NW, 1, MT, DT, IDX, RPC, DLY, EnMon>;
+
+// IW: index width, NW: number of ways, VW: number of victim cache ways, P: number of partitions
+// MT: metadata type, DT: data type (void if not in use)
+// IDX: indexer type, RPC: replacer type
+// EnMon: whether to enable monitoring
+template<int IW, int NW, int VW, int P, typename MT, typename DT, typename IDX, typename RPC, typename VPRC, typename DLY, bool EnMon,
+         typename = typename std::enable_if<std::is_base_of<CMMetadataBase, MT>::value>::type,  // MT <- CMMetadataBase
+         typename = typename std::enable_if<std::is_base_of<CMDataBase, DT>::value || std::is_void<DT>::value>::type, // DT <- CMDataBase or void
+         typename = typename std::enable_if<std::is_base_of<IndexFuncBase, IDX>::value>::type,  // IDX <- IndexFuncBase
+         typename = typename std::enable_if<std::is_base_of<ReplaceFuncBase, RPC>::value>::type,  // RPC <- ReplaceFuncBase
+         typename = typename std::enable_if<std::is_base_of<DelayBase, DLY>::value || std::is_void<DLY>::value>::type>  // DLY <- DelayBase or void
+class CacheSkewedWithVC : public CacheSkewed<IW, NW, P, MT, DT, IDX, RPC, DLY, EnMon> 
+{
+protected:
+  VPRC v_replacer;
+public:
+  CacheSkewedWithVC(std::string name = "")
+    :  CacheSkewed<IW, NW, P, MT, DT, IDX, RPC, DLY, EnMon>(name)
+  {
+    this->arrays.resize(P+1);
+    this->arrays[P] = new CacheArrayNorm<0, VW, MT, DT>;
+  }
+
+  virtual ~CacheSkewedWithVC() {}
+
+  virtual bool hit(uint64_t addr, uint32_t *ai, uint32_t *s, uint32_t *w ) {
+    for(*ai=0; *ai<P; (*ai)++) {
+      *s = this->indexer.index(addr, *ai);
+      for(*w=0; *w<NW; (*w)++)
+        if(this->access(*ai, *s, *w)->match(addr)) return true;
+    }
+    *ai = P; *s = 0;
+    for(*w=0; *w<VW; (*w)++)
+      if(this->access(*ai, *s, *w)->match(addr)) return true;
+    return false;
+  }
+
+  virtual void hook_read(uint64_t addr, uint32_t ai, uint32_t s, uint32_t w, bool hit, uint64_t *delay) {
+    if(ai == P) v_replacer.access(s, w);
+    else        this->replacer[ai].access(s, w);    
+    if constexpr (EnMon) for(auto m:this->monitors) m->read(addr, ai, s, w, hit);
+    if constexpr (!std::is_void<DLY>::value) this->timer->read(addr, ai, s, w, hit, delay);
+  }
+
+  virtual void hook_write(uint64_t addr, uint32_t ai, uint32_t s, uint32_t w, bool hit, uint64_t *delay) {
+    if(ai == P) v_replacer.access(s, w);
+    else        this->replacer[ai].access(s, w);  
+    if constexpr (EnMon) for(auto m:this->monitors) m->write(addr, ai, s, w, hit);
+    if constexpr (!std::is_void<DLY>::value) this->timer->write(addr, ai, s, w, hit, delay);
+  }
+
+  virtual void hook_manage(uint64_t addr, uint32_t ai, uint32_t s, uint32_t w, bool hit, bool evict, bool writeback, uint64_t *delay) {
+    if(hit && evict) {
+      if(ai == P) v_replacer.invalid(s, w);
+      else        this->replacer[ai].invalid(s, w);  
+      if constexpr (EnMon) for(auto m:this->monitors) m->invalid(addr, ai, s, w);
+    }
+    if constexpr (!std::is_void<DLY>::value) this->timer->manage(addr, ai, s, w, hit, evict, writeback, delay);
+  }
+
+  virtual void replace(uint64_t addr, uint32_t *ai, uint32_t *s, uint32_t *w, uint32_t* v_ai, uint32_t *v_s, uint32_t* v_w){
+    if constexpr (P==1) *ai = 0;
+    else                *ai = (cm_get_random_uint32() % P);
+    *s = this->indexer.index(addr, *ai);
+    this->replacer[*ai].replace(*s, w);
+
+    *v_ai = P; *v_s = 0;
+    v_replacer.replace(*v_s, v_w);
+  }
+};
+
+// IW: index width, NW: number of ways, VW: number of victim cache ways, P: number of partitions
+// MT: metadata type, DT: data type (void if not in use)
+// IDX: indexer type, RPC: replacer type
+// EnMon: whether to enable monitoring
+template<int IW, int NW, int VW, typename MT, typename DT, typename IDX, typename RPC, typename VPRC, typename DLY, bool EnMon>
+using CacheNormWithVC = CacheSkewedWithVC<IW, NW, VW, 1, MT, DT, IDX, RPC, VPRC, DLY, EnMon>;
 
 #endif

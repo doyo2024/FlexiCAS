@@ -133,6 +133,12 @@ namespace // file visibility
       }
     }
 
+    // set the meta state same to mmeta
+    static inline void meta_copy_state(CMMetadataBase *meta, CMMetadataBase *mmeta, uint64_t addr){
+      meta->init(addr);
+      if(mmeta->is_dirty()) meta->to_dirty(); else meta->to_clean();
+      if(mmeta->is_shared()) meta->to_shared(); else meta->to_modified();
+    }
   };
 
 }
