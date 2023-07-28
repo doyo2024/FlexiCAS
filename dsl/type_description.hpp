@@ -154,6 +154,26 @@ public:
   virtual void emit(std::ofstream &file);
 };
 
+class TypeCacheSkewedWithVC : public TypeCacheBase
+{
+  int IW, NW, VW, P; std::string MT, DT, IDX, RPC, VRPC, DLY; bool EnMon;
+  const std::string tname;
+public:
+  TypeCacheSkewedWithVC(const std::string &name) : TypeCacheBase(name), tname("CacheSkewedWithVC") {}
+  virtual bool set(std::list<std::string> &values); 
+  virtual void emit(std::ofstream &file);
+};
+
+class TypeCacheNormWithVC : public TypeCacheBase
+{
+  int IW, NW, VW; std::string MT, DT, IDX, RPC, VRPC, DLY; bool EnMon;
+  const std::string tname;
+public:
+  TypeCacheNormWithVC(const std::string &name) : TypeCacheBase(name), tname("CacheNormWithVC") {}
+  virtual bool set(std::list<std::string> &values); 
+  virtual void emit(std::ofstream &file);
+};
+
 ////////////////////////////// Coherent Cache ///////////////////////////////////////////////
 
 class TypeOuterCohPortBase : public Description {
@@ -170,11 +190,31 @@ public:
   virtual void emit_header();
 };
 
+class TypeOuterPortMSIUncachedWithVC : public TypeOuterCohPortBase {
+  std::string MT, DT;
+  const std::string tname;
+public:
+  TypeOuterPortMSIUncachedWithVC(const std::string &name) : TypeOuterCohPortBase(name), tname("OuterPortMSIUncachedWithVC") {}
+  virtual bool set(std::list<std::string> &values);
+  virtual void emit(std::ofstream &file);
+  virtual void emit_header();
+};
+
 class TypeOuterPortMSI : public TypeOuterCohPortBase {
   std::string MT, DT;
   const std::string tname;
 public:
   TypeOuterPortMSI(const std::string &name) : TypeOuterCohPortBase(name), tname("OuterPortMSI") {}
+  virtual bool set(std::list<std::string> &values);  
+  virtual void emit(std::ofstream &file);
+  virtual void emit_header();
+};
+
+class TypeOuterPortMSIWithVC : public TypeOuterCohPortBase {
+  std::string MT, DT;
+  const std::string tname;
+public:
+  TypeOuterPortMSIWithVC(const std::string &name) : TypeOuterCohPortBase(name), tname("OuterPortMSIWithVC") {}
   virtual bool set(std::list<std::string> &values);  
   virtual void emit(std::ofstream &file);
   virtual void emit_header();
@@ -195,12 +235,32 @@ public:
   virtual void emit_header();
 };
 
+class TypeInnerPortMSIUncachedWithVC : public TypeInnerCohPortBase{
+  std::string MT, DT; bool isLLC;
+  const std::string tname;
+public:
+  TypeInnerPortMSIUncachedWithVC(const std::string &name) : TypeInnerCohPortBase(name), tname("InnerPortMSIUncachedWithVC") {}
+  virtual bool set(std::list<std::string> &values);  
+  virtual void emit(std::ofstream &file);
+  virtual void emit_header();
+};
+
 class TypeInnerPortMSIBroadcast : public TypeInnerCohPortBase
 {
   std::string MT, DT; bool isLLC;
   const std::string tname;
 public:
   TypeInnerPortMSIBroadcast(const std::string &name) : TypeInnerCohPortBase(name), tname("InnerPortMSIBroadcast") {}
+  virtual bool set(std::list<std::string> &values);  
+  virtual void emit(std::ofstream &file);
+  virtual void emit_header();
+};
+
+class TypeInnerPortMSIBroadcastWithVC : public TypeInnerCohPortBase{
+  std::string MT, DT; bool isLLC;
+  const std::string tname;
+public:
+  TypeInnerPortMSIBroadcastWithVC(const std::string &name) : TypeInnerCohPortBase(name), tname("InnerPortMSIBroadcastWithVC") {}
   virtual bool set(std::list<std::string> &values);  
   virtual void emit(std::ofstream &file);
   virtual void emit_header();
@@ -216,6 +276,17 @@ class TypeCoreInterfaceMSI : public TypeCoreInterfaceBase
   const std::string tname;
 public:
   TypeCoreInterfaceMSI(const std::string &name) : TypeCoreInterfaceBase(name), tname("CoreInterfaceMSI") {}
+  virtual bool set(std::list<std::string> &values);  
+  virtual void emit(std::ofstream &file);
+  virtual void emit_header();
+};
+
+class TypeCoreInterfaceMSIWithVC : public TypeCoreInterfaceBase
+{
+  std::string MT, DT; bool enableDelay, isLLC;
+  const std::string tname;
+public:
+  TypeCoreInterfaceMSIWithVC(const std::string &name) : TypeCoreInterfaceBase(name), tname("TypeCoreInterfaceMSIWithVC") {}
   virtual bool set(std::list<std::string> &values);  
   virtual void emit(std::ofstream &file);
   virtual void emit_header();
