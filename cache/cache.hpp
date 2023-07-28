@@ -281,7 +281,7 @@ using CacheNorm = CacheSkewed<IW, NW, 1, MT, DT, IDX, RPC, DLY, EnMon>;
 // MT: metadata type, DT: data type (void if not in use)
 // IDX: indexer type, RPC: replacer type
 // EnMon: whether to enable monitoring
-template<int IW, int NW, int VW, int P, typename MT, typename DT, typename IDX, typename RPC, typename VPRC, typename DLY, bool EnMon,
+template<int IW, int NW, int VW, int P, typename MT, typename DT, typename IDX, typename RPC, typename VRPC, typename DLY, bool EnMon,
          typename = typename std::enable_if<std::is_base_of<CMMetadataBase, MT>::value>::type,  // MT <- CMMetadataBase
          typename = typename std::enable_if<std::is_base_of<CMDataBase, DT>::value || std::is_void<DT>::value>::type, // DT <- CMDataBase or void
          typename = typename std::enable_if<std::is_base_of<IndexFuncBase, IDX>::value>::type,  // IDX <- IndexFuncBase
@@ -290,7 +290,7 @@ template<int IW, int NW, int VW, int P, typename MT, typename DT, typename IDX, 
 class CacheSkewedWithVC : public CacheSkewed<IW, NW, P, MT, DT, IDX, RPC, DLY, EnMon> 
 {
 protected:
-  VPRC v_replacer;
+  VRPC v_replacer;
 public:
   CacheSkewedWithVC(std::string name = "")
     :  CacheSkewed<IW, NW, P, MT, DT, IDX, RPC, DLY, EnMon>(name)
