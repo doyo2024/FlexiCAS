@@ -279,13 +279,14 @@ using CacheNorm = CacheSkewed<IW, NW, 1, MT, DT, IDX, RPC, DLY, EnMon>;
 
 // IW: index width, NW: number of ways, VW: number of victim cache ways, P: number of partitions
 // MT: metadata type, DT: data type (void if not in use)
-// IDX: indexer type, RPC: replacer type
+// IDX: indexer type, RPC: replacer type, VRPC: victim cache replacer type
 // EnMon: whether to enable monitoring
 template<int IW, int NW, int VW, int P, typename MT, typename DT, typename IDX, typename RPC, typename VRPC, typename DLY, bool EnMon,
          typename = typename std::enable_if<std::is_base_of<CMMetadataBase, MT>::value>::type,  // MT <- CMMetadataBase
          typename = typename std::enable_if<std::is_base_of<CMDataBase, DT>::value || std::is_void<DT>::value>::type, // DT <- CMDataBase or void
          typename = typename std::enable_if<std::is_base_of<IndexFuncBase, IDX>::value>::type,  // IDX <- IndexFuncBase
          typename = typename std::enable_if<std::is_base_of<ReplaceFuncBase, RPC>::value>::type,  // RPC <- ReplaceFuncBase
+         typename = typename std::enable_if<std::is_base_of<ReplaceFuncBase, VRPC>::value>::type,  // VRPC <- ReplaceFuncBase
          typename = typename std::enable_if<std::is_base_of<DelayBase, DLY>::value || std::is_void<DLY>::value>::type>  // DLY <- DelayBase or void
 class CacheSkewedWithVC : public CacheSkewed<IW, NW, P, MT, DT, IDX, RPC, DLY, EnMon> 
 {
@@ -349,7 +350,7 @@ public:
 
 // IW: index width, NW: number of ways, VW: number of victim cache ways, P: number of partitions
 // MT: metadata type, DT: data type (void if not in use)
-// IDX: indexer type, RPC: replacer type
+// IDX: indexer type, RPC: replacer type, VRPC: victim cache replacer type
 // EnMon: whether to enable monitoring
 template<int IW, int NW, int VW, typename MT, typename DT, typename IDX, typename RPC, typename VPRC, typename DLY, bool EnMon>
 using CacheNormWithVC = CacheSkewedWithVC<IW, NW, VW, 1, MT, DT, IDX, RPC, VPRC, DLY, EnMon>;
