@@ -44,6 +44,8 @@ namespace {
   std::mutex xact_queue_empty_mutex;
   static bool exit_flag = false;
 
+  uint64_t latency = 0;
+  
   struct cache_xact {
     char op_t;
     bool ic;
@@ -90,18 +92,18 @@ namespace {
         switch(xact.op_t) {
         case 0: // read
           if(xact.ic)
-            core_inst[xact.core]->read(xact.addr, nullptr);
+            core_inst[xact.core]->read(xact.addr, &latency);
           else
-            core_data[xact.core]->read(xact.addr, nullptr);
+            core_data[xact.core]->read(xact.addr, &latency);
           break;
         case 1: //write
-          core_data[xact.core]->write(xact.addr, nullptr, nullptr);
+          core_data[xact.core]->write(xact.addr, nullptr, &latency);
           break;
         case 2: // flush
-          core_data[xact.core]->flush(xact.addr, nullptr);
+          core_data[xact.core]->flush(xact.addr, &latency);
           break;
         case 3: // writeback
-          core_data[xact.core]->writeback(xact.addr, nullptr);
+          core_data[xact.core]->writeback(xact.addr, &latency);
           break;
         default:
           assert(0 == "unknown op type!");
@@ -140,14 +142,14 @@ namespace flexicas {
 
   void init(int ncore) {
     NC = ncore;
-    auto l1d = cache_gen_l1<L1IW, L1WN, void, MetadataBroadcastBase, ReplaceLRU, MSIPolicy, false, false, void, true>(NC, "l1d");
+    auto l1d = cache_gen_l1<L1IW, L1WN, void, MetadataBroadcastBase, ReplaceLRU, MSIPolicy, false, false, DelayL1<4, 5, 3>, true>(NC, "l1d");
     core_data = get_l1_core_interface(l1d);
-    auto l1i = cache_gen_l1<L1IW, L1WN, void, MetadataBroadcastBase, ReplaceLRU, MSIPolicy, false, true, void, true>(NC, "l1i");
+    auto l1i = cache_gen_l1<L1IW, L1WN, void, MetadataBroadcastBase, ReplaceLRU, MSIPolicy, false, true, DelayL1<4, 5, 3>, true>(NC, "l1i");
     core_inst = get_l1_core_interface(l1i);
-    auto l2 = cache_gen_l2_exc<L2IW, L2WN, void, MetadataBroadcastBase, ReplaceSRRIP, MSIPolicy, false, void, true>(NC, "l2");
-    auto l3 = cache_gen_llc_inc<L3IW, L3WN, void, MetadataDirectoryBase, ReplaceSRRIP, MESIPolicy, void, true>(NC, "l3");
+    auto l2 = cache_gen_l2_exc<L2IW, L2WN, void, MetadataBroadcastBase, ReplaceSRRIP, MSIPolicy, false, DelayCoherentCache<10, 3, 32>, true>(NC, "l2");
+    auto l3 = cache_gen_llc_inc<L3IW, L3WN, void, MetadataDirectoryBase, ReplaceSRRIP, MESIPolicy, DelayCoherentCache<100, 32, 64>, true>(NC, "l3");
     auto dispatcher = new SliceDispatcher<SliceHashNorm<> >("disp", NC);
-    auto mem = new SimpleMemoryModel<void,void,true>("mem");
+    auto mem = new SimpleMemoryModel<void,DelayMemory<350>,true>("mem");
 
     for(int i=0; i<NC; i++) {
       l1i[i]->outer->connect(l2[i]->inner, l2[i]->inner->connect(l1i[i]->outer, true));
