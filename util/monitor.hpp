@@ -5,6 +5,10 @@
 #include <set>
 #include "util/delay.hpp"
 #include "util/concept_macro.hpp"
+#include <vector>
+#define PI 3.14159265358979323846
+static const double pow_2_32 = 4294967296.0;
+static const double neg_pow_2_32 = -4294967296.0;
 
 class CMDataBase;
 class CMMetadataBase;
@@ -187,4 +191,78 @@ public:
   virtual void reset() { active = false; }
 };
 
+class HLLMonitor : public MonitorBase
+{
+protected:
+  const double threshold;
+  uint8_t b_; 
+  uint32_t m_; 
+  std::vector<uint8_t> M_; 
+  double alphaMM_; 
+  const uint64_t period;      
+  double estimate;  
+  bool active;
+  uint64_t cnt_access, cnt_miss, cnt_write, cnt_write_miss, cnt_invalid;
+  bool HLL_detect();
+  void HLL_update(uint64_t addr);
+
+public:
+  HLLMonitor(double th,uint8_t b,uint64_t period)
+    : threshold(th), b_(b), m_(1u << b), M_(m_, 0), period(period), estimate(0.0), cnt_access(0), cnt_miss(0), cnt_write(0), cnt_write_miss(0), cnt_invalid(0), active(true){
+      const double alpha = (m_ == 64) ? 0.709 : (m_ == 32) ? 0.697 : (m_ == 16) ? 0.673 : 0.7213 / (1.0 + 1.079 / m_);
+      alphaMM_ = alpha * m_ * m_;
+  }
+  virtual ~HLLMonitor() {}
+
+  virtual bool attach(uint64_t cache_id) { return true; }
+
+  virtual void read(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, bool hit, const CMMetadataBase *meta, const CMDataBase *data);
+  virtual void write(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, bool hit, const CMMetadataBase *meta, const CMDataBase *data);
+  virtual void invalid(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, const CMMetadataBase *meta, const CMDataBase *data);
+
+  virtual void start() { active = true;  }
+  virtual void stop()  { active = false; }
+  virtual void pause() { active = false; }
+  virtual void resume() { active = true; }
+  virtual void reset() { active = false; }
+  virtual void clean_history();
+};
+
+class SetCSAMonitor : public MonitorBase
+{
+protected:
+  const double factor;
+  const uint32_t nset;
+  const double threshold;
+  const uint64_t access_period, evict_period;
+  std::vector<uint64_t> evicts;
+  std::vector<double> set_evict_history;
+  uint64_t accesses;
+  uint64_t total_evicts;
+  bool remap_enable;
+  bool active;
+
+  bool set_evict_detect();
+
+public:
+  SetCSAMonitor(const double factor, uint32_t nset, uint32_t nway, uint64_t access_period, uint64_t evict_period, double th, bool re = false)
+    : factor(factor), nset(nset), threshold(th),
+      access_period(access_period), evict_period(evict_period), evicts(std::vector<uint64_t>(nset, 0)),
+      set_evict_history(std::vector<double>(nset, 0.0)),
+      accesses(0), total_evicts(0), remap_enable(re) {}
+  virtual ~SetCSAMonitor() {}
+
+  virtual bool attach(uint64_t cache_id) { return true; }
+
+  virtual void read(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, bool hit, const CMMetadataBase *meta, const CMDataBase *data);
+  virtual void write(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, bool hit, const CMMetadataBase *meta, const CMDataBase *data);
+  virtual void invalid(uint64_t cache_id, uint64_t addr, int32_t ai, int32_t s, int32_t w, const CMMetadataBase *meta, const CMDataBase *data);
+
+  virtual void start() { active = true;  }
+  virtual void stop()  { active = false; }
+  virtual void pause() { active = false; }
+  virtual void resume() { active = true; }
+  virtual void reset() { active = false; }
+  virtual void clean_history();
+};
 #endif
