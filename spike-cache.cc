@@ -35,6 +35,8 @@
 #define XACT_QUEUE_LOW     10
 
 namespace {
+  static const unsigned int CSR_FLEXICAS_PFC = 0x8F0;
+  static const unsigned int CSR_FLEXICAS_DLY = 0x8F1;
   static std::vector<CoreInterface *> core_data, core_inst;
   static SimpleTracer tracer(true);
   static int NC = 0;
@@ -199,12 +201,15 @@ namespace flexicas {
     xact_queue_add({CACHE_OP_WRITEBACK, false, core, addr});
   }
 
-  void csr_write(uint64_t cmd) {
+  void csr_write(uint64_t cmd, const uint64_t addr) {
     // ToDo: connect this with monitor
   }
 
-  uint64_t csr_read() {
+  uint64_t csr_read(const uint64_t addr) {
     // ToDo: connect this with monitor
-    return 0;
+    switch(addr) {
+    case CSR_FLEXICAS_DLY: return latency;
+    default: return 0;
+    }
   }
 }
