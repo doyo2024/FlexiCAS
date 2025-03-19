@@ -1,5 +1,5 @@
-#include "replayer/st_parser.hpp"
-#include "replayer/synchro_trace.hpp"
+#include "replayer/parser.hpp"
+#include "replayer/replayer.hpp"
 #include "util/cache_type.hpp"
 #include "util/delay.hpp"
 #include "cache/memory.hpp"
@@ -11,6 +11,9 @@
 #include "cache/coherence_multi.hpp"
 #include "cache/memory_multi.hpp"
 
+#include <chrono>
+#include <iostream>
+
 #define L1IW 4
 #define L1WN 4
 
@@ -21,6 +24,8 @@
 #define NCore 2
 
 int main(){
+
+  auto st = std::chrono::high_resolution_clock::now();
 
   auto l1d = cache_gen_multi_thread_l1<L1IW, L1WN, void, MetadataBroadcastBase, ReplaceLRUMultiThread, MSIMultiThreadPolicy, false, false, DelayL1<1, 1, 1>, true>(NCore, "l1d");
   auto core_data = get_l1_core_interface(l1d);
@@ -36,7 +41,11 @@ int main(){
   }
   l2->outer->connect(mem, mem->connect(l2->outer));
 
-  SynchroTraceReplayer<NThread, NCore> replayer("./regression", 1.0, 2.0, 1, 1, 300, core_data);
+  traceReplayer<NThread, NCore> replayer("/home/spike/Desktop/trace/mutex", 1.0, 2.0, 1, 1, 300000, core_data);
   replayer.init();
   replayer.start();
+
+  auto ed = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> time = ed - st;
+  std::cout << "Time: " << time.count() << "ms\n";
 }
