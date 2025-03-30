@@ -29,6 +29,7 @@ endif
 
 UTIL_HEADERS  = $(wildcard util/*.hpp)
 CACHE_HEADERS = $(wildcard cache/*.hpp)
+REPLAYER_HEADERS = $(wildcard replayer/*.hpp)
 
 CRYPTO_LIB    = cryptopp/libcryptopp.a
 UTIL_OBJS     = util/random.o util/query.o util/statistics.o
@@ -80,6 +81,18 @@ clean-regression:
 	-rm $(REGRESSION_TESTS_LOG) $(REGRESSION_TESTS_EXE) $(REGRESSION_TESTS_RST)
 	-rm $(PARALLEL_REGRESSION_TESTS_EXE) $(PARALLEL_REGRESSION_TESTS_RST)
 
+REPLAYER_TESTS = replayer
+
+REPLAYER_EXE = $(patsubst %, replayer/%, $(REPLAYER_TESTS))
+
+$(REPLAYER_EXE): %:%.cpp $(CACHE_OBJS) $(UTIL_OBJS) $(CRYPTO_LIB) $(REPLAYER_HEADERS)
+	$(CXX) $(CXXFLAGS) $< $(CACHE_OBJS) $(UTIL_OBJS) $(CRYPTO_LIB) -o $@ -lz
+
+replayer: $(REPLAYER_EXE)
+
+clean-replayer:
+	-rm $(REPLAYER_EXE)
+
 libflexicas.a: $(UTIL_OBJS) $(CRYPTO_LIB)
 	ar rvs $@ $(UTIL_OBJS) $(CRYPTO_LIB)
 
@@ -88,6 +101,7 @@ libflexicas.a: $(UTIL_OBJS) $(CRYPTO_LIB)
 clean:
 	-$(MAKE) clean-regression
 	-$(MAKE) clean-parallel-regression temp.log
+	-$(MAKE) clean-replayer
 	-rm $(UTIL_OBJS)
 
 .PHONY: clean
