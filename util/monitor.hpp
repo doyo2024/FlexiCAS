@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <thread>
+#include <fstream>
 #include <boost/format.hpp>
 #include "util/delay.hpp"
 #include "util/concept_macro.hpp"
@@ -195,6 +196,31 @@ public:
   uint64_t get_miss_read() { return cnt_miss - cnt_write_miss; }
   uint64_t get_miss_write() { return cnt_write_miss; }
   uint64_t get_invalid() { return cnt_invalid; }
+};
+
+class MissMonitor : public SimpleAccMonitor
+{
+protected:
+  std::string filename;
+  std::ofstream resultFile;
+public:
+  MissMonitor(std::string resultDir, std::string cachename, int id, bool active = false) :
+    SimpleAccMonitor(active) {
+      filename = resultDir + "/" + cachename + "-" + std::to_string(id) + ".out";
+      resultFile.open(filename.c_str(), std::ios::out | std::ios::trunc);
+      if (!resultFile.is_open()) {
+        std::cerr << "Error opening file:" << filename << std::endl;
+        assert(0); 
+      }
+    }
+
+  ~MissMonitor() {
+    resultFile.close();
+  }
+
+  void record() {
+    resultFile << cnt_access << " " << cnt_miss << " " << cnt_write << " " << cnt_write_miss << " " << cnt_invalid << std::endl;
+  }
 };
 
 // a tracer

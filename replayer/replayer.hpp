@@ -7,7 +7,7 @@
 #include "event.hpp"
 #include "reader.hpp"
 #include "thread.hpp"
-#include "cache/coherence.hpp"
+#include "util/monitor.hpp"
 
 class traceReplayerBase
 {
@@ -64,6 +64,11 @@ protected:
   /** threads for each core */
   std::vector<std::thread> replayCore;
 
+  /** miss rate monitor */
+  // MissMonitor* monitor;
+  std::vector<MissMonitor *>& monitor;
+  uint64_t eventCnt;
+
   uint64_t memDelay;
 
   virtual bool checkComm(const CommInfo comm) = 0;
@@ -87,8 +92,8 @@ protected:
   virtual void wakeupCore(ThreadID threadId, CoreID coreId) = 0;
 
 public:
-  traceReplayerBase(std::string eventDir, std::vector<CoreInterfaceBase *>& core_data, std::vector<CoreInterfaceBase *>& core_inst) : 
-   eventDir(eventDir), core_data(core_data), core_inst(core_inst) {
+  traceReplayerBase(std::string eventDir, std::vector<CoreInterfaceBase *>& core_data, std::vector<CoreInterfaceBase *>& core_inst, std::vector<MissMonitor *>& monitor) : 
+   eventDir(eventDir), core_data(core_data), core_inst(core_inst), monitor(monitor), eventCnt(0) {
 
   }
 
@@ -180,7 +185,7 @@ protected:
     // Send the load/store
 
     uint64_t icacheDelay = accessICache(coreId, ev.pc);
-    uint64_t dcacheDelay = accessDCache(coreId, ev.commEvent.addr, ev.commEvent.bytes, ReqType::REQ_READ);
+    uint64_t dcacheDelay = accessDCache(coreId, ev.memEvent.addr, ev.memEvent.bytes, (ReqType)ev.memEvent.type);
     scheduler.schedule(tcxt, icacheDelay + dcacheDelay);
     // tcxt->status = ThreadStatus::WAIT_MEMORY;
     tcxt->traces.popEvent();
@@ -197,6 +202,8 @@ protected:
   virtual void replayComm(ThreadContext* tcxt, CoreID coreId) {
     const traceEvent& ev = tcxt->traces.getEvent();
     assert(ev.tag == Tag::COMMUNICATION);
+
+    scheduler.recordEvent(tcxt);
 
     bool blocked = false;
 
@@ -243,7 +250,7 @@ protected:
 
     // // If the dependency is not satisfied, visit the memory.
     // scheduler.schedule(tcxt, accessDCache(coreId, ev.commEvent.addr, ev.commEvent.bytes, ReqType::REQ_READ));
-    // tcxt->status = ThreadStatus::WAIT_MEMORY;
+    // // tcxt->status = ThreadStatus::WAIT_MEMORY;
 
     // delete(ev.commEvent.comm);    // free the space for the communication list
     // tcxt->traces.popEvent();
@@ -556,12 +563,15 @@ protected:
     const traceEvent& ev = tcxt->traces.getEvent();
     switch (ev.tag) {
       case Tag::COMPUTE:
+        ++eventCnt;
         replayComp(tcxt, coreId);
         break;
       case Tag::MEMORY:
+        ++eventCnt;
         replayMem(tcxt, coreId);
         break;
       case Tag::COMMUNICATION:
+        ++eventCnt;
         replayComm(tcxt, coreId);
         break;
       case Tag::PTHREAD:
@@ -584,6 +594,13 @@ protected:
         std::cout << "Undefined Tag: " << (int)ev.tag << " in Thread " << threadId << " on Core " << (int)coreId << " at Event " << tcxt->curEventId << std::endl; 
         outputMtx.unlock();
         assert(0);
+    }
+
+    if (eventCnt == 1000) {
+      eventCnt = 0;
+      for (auto it : monitor)
+        it->record();
+      // monitor->record();
     }
 
     // auto ed = std::chrono::high_resolution_clock::now();
@@ -609,10 +626,6 @@ protected:
         std::this_thread::yield();
       }
 
-      // if(replayer->scheduler.nextClock(coreId) % 100000 == 0) {
-      // if(replayer->scheduler.nextClock(coreId) % 100000 < 5) {
-      //   replayer->scheduler.wakeupDebugLog(coreId);
-      // }
       (void)replayer->scheduler.nextClock(coreId);
     }
 
@@ -630,8 +643,8 @@ protected:
 public:
   traceReplayer(std::string eventDir, float CPI_IOPS, float CPI_FLOPS, uint32_t cxtSwitchCycles, 
     uint32_t pthCycles, uint32_t schedSliceCycles, std::vector<CoreInterfaceBase *>& core_data,
-    std::vector<CoreInterfaceBase *>& core_inst) 
-  : traceReplayerBase(eventDir, core_data, core_inst),
+    std::vector<CoreInterfaceBase *>& core_inst, std::vector<MissMonitor *>& monitor) 
+  : traceReplayerBase(eventDir, core_data, core_inst, monitor),
     scheduler(CPI_IOPS, CPI_FLOPS, cxtSwitchCycles, pthCycles, schedSliceCycles)
   {
     threadContexts.resize(NT + 1);

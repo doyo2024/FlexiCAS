@@ -301,6 +301,9 @@ public:
     swapByID(coreId, lastUser[coreId]);
     ThreadContext* tcxt = threadQueue[coreId].front();
     tcxt->status = ThreadStatus::ACTIVE;
+    // outputMtx.lock();
+    // std::cout << "switch back to user thread " << tcxt->threadId << std::endl;
+    // outputMtx.unlock();
   }
 
   virtual void waitComm(ThreadID threadId, CommInfo comm) {
@@ -353,7 +356,7 @@ public:
 
     // CoreID coreId = threadIdToCoreId(tcxt->threadId);
     tcxt->wakeupClock = curClock(tcxt->coreId) + cycles - 1;
-    if (tcxt->status != ThreadStatus::WAIT_SCHED && !tcxt->blocked())
+    if (tcxt->threadId && tcxt->status != ThreadStatus::WAIT_SCHED && !tcxt->blocked())
       tcxt->restSliceCycles -= cycles;
   }
 
@@ -368,7 +371,7 @@ public:
     if (tcxt->status == ThreadStatus::ACTIVE) {
       if (tcxt->restSliceCycles <= 0) {                   // if the thread has used up its slice
         tcxt->restSliceCycles = schedSliceCycles;
-        if (tryCxtSwap(coreId)) {
+        if (tcxt->threadId && tryCxtSwap(coreId)) {
           tcxt->status = ThreadStatus::WAIT_SCHED;
           tcxt->wakeupClock = curClock(coreId) + schedSliceCycles;
         }
@@ -430,7 +433,7 @@ public:
     }
 
     if (checkCount[coreId] == 9999) {
-      wakeupDebugLog(coreId);
+      // wakeupDebugLog(coreId);
       checkCount[coreId] = 0;
     } else {
       checkCount[coreId]++;
