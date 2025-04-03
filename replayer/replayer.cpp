@@ -33,8 +33,11 @@
 #define NThread 1
 #define NCore 1
 
-std::string traceDir = "/home/yzx/yzx/trace/spec/502";
-std::string resultDir = "/home/yzx/yzx/results/spec/502";
+std::string traceDir = "/home/yzx/yzx/trace/spec/500/test-0";
+std::string resultDir = "/home/yzx/yzx/results/spec/500";
+
+// std::string traceDir = "/home/yzx/yzx/trace/mutex/test-0";
+// std::string resultDir = "/home/yzx/yzx/results/mutex";
 
 int main(){
 

@@ -219,7 +219,13 @@ public:
   }
 
   void record() {
-    resultFile << cnt_access << " " << cnt_miss << " " << cnt_write << " " << cnt_write_miss << " " << cnt_invalid << std::endl;
+    resultFile << cnt_access << " " << cnt_miss << " " << cnt_write << " " << cnt_write_miss << " " << cnt_invalid << " ";
+    if (cnt_access)
+      resultFile << (double)(1.00 * cnt_miss / cnt_access) << std::endl;
+    else
+      resultFile << 0 << std::endl;
+    reset();
+    active = true;
   }
 };
 

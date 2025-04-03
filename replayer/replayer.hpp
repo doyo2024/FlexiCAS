@@ -140,6 +140,9 @@ protected:
    * Call the API offered by FlexiCAS.
    */
   virtual uint64_t accessICache(CoreID coreId, uint64_t addr) {
+    if (!addr)
+      return 0;
+
     uint64_t delay = 0;
     cacheMtx.lock();
     core_inst[coreId]->read(addr, &delay);
